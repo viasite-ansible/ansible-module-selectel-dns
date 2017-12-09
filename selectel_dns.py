@@ -242,7 +242,7 @@ def main():
                 if not value:
                     module.fail_json(msg="Missing the record value")
 
-                if record == '':
+                if record == '' or record == '@':
                     record = dr.name
 
                 if not re.search('%s$' % dr.name, record):

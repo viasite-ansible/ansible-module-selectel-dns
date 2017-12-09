@@ -1,0 +1,46 @@
+---
+- name: test add domain and records
+  connection: local
+  hosts: localhost
+
+  tasks:
+    - name: add domain
+      selectel_dns:
+        domain: ansible-selectel-dns.ru
+        state: present
+      register: domain
+
+    #- debug: var=domain
+
+    - name: add records
+      selectel_dns:
+        domain: ansible-selectel-dns.ru
+        record: "{{ item.record }}"
+        type: "{{ item.type }}"
+        value: "{{ item.value }}"
+        ttl: "{{ item.ttl | default(omit) }}"
+        solo: "{{ item.solo | default(true) }}"
+        priority: "{{ item.priority | default(omit) }}"
+        state: present
+      with_items:
+        - record: ''
+          type: MX
+          value: mx.yandex.ru
+          priority: 10
+
+        - record: ''
+          type: TXT
+          value: "v=spf1 a include:_spf.yandex.net ~all"
+
+        - record: ''
+          type: A
+          value: 1.2.3.4
+          ttl: 600
+
+        - record: 'www'
+          type: A
+          value: 1.2.3.4
+          ttl: 600
+      register: records
+
+    #- debug: "var=records"

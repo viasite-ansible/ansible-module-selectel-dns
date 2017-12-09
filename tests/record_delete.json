@@ -1,0 +1,9 @@
+{
+    "ANSIBLE_MODULE_ARGS": {
+        "domain": "ansible-selectel-dns.ru",
+        "record": "",
+        "type": "A",
+        "value": "1.2.3.4",
+        "state": "absent"
+    }
+}

@@ -141,6 +141,13 @@ except ImportError:
     HAS_SELECTEL_DNS = False
 
 
+def domain_idna(domain):
+    if isinstance(domain, str):
+        return domain.decode('utf-8').encode('idna')
+    else:
+        return domain.encode('idna')
+
+
 def main():
     module = AnsibleModule(
         argument_spec=dict(
@@ -191,76 +198,95 @@ def main():
             domains = domains_api.get_domains()
             module.exit_json(changed=False, result=[d.name for d in domains])
 
-        # Domain & No record
-        if domain and record is None:
-            domains = domains_api.get_domains()
-            dr = next((d for d in domains if d.name == domain), None)
-            if state == 'present':
-                if dr:
-                    module.exit_json(changed=False, result=dr.to_dict())
-                else:
-                    if module.check_mode:
+        else:
+            domain = domain_idna(domain)
+
+            # Domain & No record
+            if record is None:
+                domains = domains_api.get_domains()
+                dr = next((d for d in domains if domain_idna(d.name) == domain), None)
+                if state == 'present':
+                    if dr:
+                        module.exit_json(changed=False, result=dr.to_dict())
+                    else:
+                        if module.check_mode:
+                            module.exit_json(changed=True)
+                        else:
+                            data = selectel_dns_api.NewDomain(domain)
+                            module.exit_json(
+                                changed=True, result=domains_api.add_domain(data).name)
+                elif state == 'absent':
+                    if dr:
+                        if not module.check_mode:
+                            domains_api.delete_domain(dr.id)
                         module.exit_json(changed=True)
                     else:
-                        data = selectel_dns_api.NewDomain(domain)
-                        module.exit_json(
-                            changed=True, result=domains_api.add_domain(data).name)
-            elif state == 'absent':
-                if dr:
-                    if not module.check_mode:
-                        domains_api.delete_domain(dr.id)
-                    module.exit_json(changed=True)
+                        module.exit_json(changed=False)
                 else:
-                    module.exit_json(changed=False)
-            else:
-                module.fail_json(
-                    msg="'%s' is an unknown value for the state argument" % state)
+                    module.fail_json(
+                        msg="'%s' is an unknown value for the state argument" % state)
 
-        # need the not none check since record could be an empty string
-        if domain and record is not None:
-            try:
-                dr = domains_api.get_domain_by_name(str(domain))
-            except ApiException as e:
-                if e.status == 404:
-                    module.fail_json(msg="Domain not exists")
-                else:
-                    module.fail_json(msg="Unable to contact Selectel: %s" % e)
+            # need the not none check since record could be an empty string
+            if record is not None:
+                try:
+                    dr = domains_api.get_domain_by_name(str(domain))
+                except ApiException as e:
+                    if e.status == 404:
+                        module.fail_json(msg="Domain not exists")
+                    else:
+                        module.fail_json(msg="Unable to contact Selectel: %s" % e)
 
-            if not record_type:
-                module.fail_json(msg="Missing the record type")
+                if not record_type:
+                    module.fail_json(msg="Missing the record type")
 
-            if not value:
-                module.fail_json(msg="Missing the record value")
+                if not value:
+                    module.fail_json(msg="Missing the record value")
 
-            if record == '':
-                record = dr.name
+                if record == '':
+                    record = dr.name
 
-            if not re.search('%s$' % dr.name, record):
-                record = '%s.%s' % (record, dr.name)
+                if not re.search('%s$' % dr.name, record):
+                    record = '%s.%s' % (record, dr.name)
 
-            records = records_api.get_resource_records_by_domain_id(dr.id)
+                records = records_api.get_resource_records_by_domain_id(dr.id)
 
-            rr = next((r for r in records if r.name == record and r.type
-                       == record_type and r.content == value), None)
+                rr = next((r for r in records if r.name == record and r.type
+                        == record_type and r.content == value), None)
 
-            if state == 'present':
-                changed = False
-                if is_solo:
-                    # delete any records that have the same name and record type
-                    same_type = [r.id for r in records if r.name
-                                 == record and r.type == record_type]
+                if state == 'present':
+                    changed = False
+                    if is_solo:
+                        # delete any records that have the same name and record type
+                        same_type = [r.id for r in records if r.name
+                                    == record and r.type == record_type]
+                        if rr:
+                            same_type = [rid for rid in same_type if rid != rr.id]
+                        if same_type:
+                            if not module.check_mode:
+                                for rid in same_type:
+                                    records_api.delete_resource_record(dr.id, rid)
+                            changed = True
                     if rr:
-                        same_type = [rid for rid in same_type if rid != rr.id]
-                    if same_type:
-                        if not module.check_mode:
-                            for rid in same_type:
-                                records_api.delete_resource_record(dr.id, rid)
-                        changed = True
-                if rr:
-                    # check if we need to update
-                    if rr.ttl != ttl or rr.priority != priority:
+                        # check if we need to update
+                        if rr.ttl != ttl or rr.priority != priority:
+                            data = selectel_dns_api.NewOrUpdatedRecord(
+                                name=record,  type=record_type, content=value)
+                            if ttl:
+                                data.ttl = ttl
+                            if priority:
+                                data.priority = priority
+                            if module.check_mode:
+                                module.exit_json(changed=True)
+                            else:
+                                rr = records_api.update_resource_record(dr.id, rr.id, data)
+                                module.exit_json(changed=True, result=rr.to_dict())
+                        else:
+                            module.exit_json(changed=changed, result=rr.to_dict())
+                    else:
+                        # create it
                         data = selectel_dns_api.NewOrUpdatedRecord(
                             name=record,  type=record_type, content=value)
+
                         if ttl:
                             data.ttl = ttl
                         if priority:
@@ -268,34 +294,18 @@ def main():
                         if module.check_mode:
                             module.exit_json(changed=True)
                         else:
-                            rr = records_api.update_resource_record(dr.id, rr.id, data)
+                            rr = records_api.add_resource_record(data, dr.id)
                             module.exit_json(changed=True, result=rr.to_dict())
-                    else:
-                        module.exit_json(changed=changed, result=rr.to_dict())
-                else:
-                    # create it
-                    data = selectel_dns_api.NewOrUpdatedRecord(
-                        name=record,  type=record_type, content=value)
-
-                    if ttl:
-                        data.ttl = ttl
-                    if priority:
-                        data.priority = priority
-                    if module.check_mode:
+                elif state == 'absent':
+                    if rr:
+                        if not module.check_mode:
+                            records_api.delete_resource_record(dr.id, rr.id)
                         module.exit_json(changed=True)
                     else:
-                        rr = records_api.add_resource_record(data, dr.id)
-                        module.exit_json(changed=True, result=rr.to_dict())
-            elif state == 'absent':
-                if rr:
-                    if not module.check_mode:
-                        records_api.delete_resource_record(dr.id, rr.id)
-                    module.exit_json(changed=True)
+                        module.exit_json(changed=False)
                 else:
-                    module.exit_json(changed=False)
-            else:
-                module.fail_json(
-                    msg="'%s' is an unknown value for the state argument" % state)
+                    module.fail_json(
+                        msg="'%s' is an unknown value for the state argument" % state)
 
     except ApiException as e:
         module.fail_json(msg="Unable to contact Selectel: %s" % e)

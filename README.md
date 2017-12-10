@@ -1,15 +1,15 @@
 # selectel_dns, Ansible Selectel DNS API module
 
-# Installation
-1. Install selectel-dns-api:
-```
+## Installation
+1. Install [selectel-dns-api](https://github.com/viasite/selectel-dns-api):
+``` bash
 pip install selectel-dns-api
 ```
 2. Copy selectel_dns.py to your modules directory
 3. Add modules directory to ansible.cfg (`library = path/to/modules`)
 
-# Test
-Replace ansible-selectel-dns.ru to your domain.
+## Test
+Replace ansible-selectel-dns.ru and селектел-днс-тест.рф to your domains.
 
 ``` bash
 bash test.sh
@@ -18,6 +18,9 @@ bash test.sh
 Inspired by [dnsimple module](http://docs.ansible.com/ansible/latest/dnsimple_module.html).
 
 Documentation generated with [jedelman8/ansible-webdocs](https://github.com/jedelman8/ansible-webdocs).
+
+Using in [viasite-ansible.site](https://github.com/viasite-ansible/ansible-role-site).
+
 
 ### *Manage DNS domains and records on Selectel DNS hosting*
 

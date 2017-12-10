@@ -74,17 +74,11 @@ author: "Stanislav Popov (@popstas)"
 '''
 
 EXAMPLES = '''
-# authenticate using API token and fetch all domains
-- selectel_dns:
-    account_api_token: dummyapitoken
-  delegate_to: localhost
-
-# fetch my.com domain records
+# create domain
 - selectel_dns:
     domain: my.com
     state: present
   delegate_to: localhost
-  register: records
 
 # delete a domain
 - selectel_dns:
@@ -99,7 +93,6 @@ EXAMPLES = '''
     type: A
     value: 127.0.0.1
   delegate_to: localhost
-  register: record
 
 # create a my.com CNAME record to example.com
 - selectel_dns

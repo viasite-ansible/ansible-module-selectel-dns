@@ -174,11 +174,12 @@ def main():
     state = module.params.get('state')
     is_solo = module.params.get('solo')
 
-    if not api_token and os.environ.get('SELECTEL_API_KEY'):
+    if not api_token:
+        if not os.environ.get('SELECTEL_API_KEY'):
+            module.fail_json(
+                msg="You must define api_token or env SELECTEL_API_KEY")
+
         api_token = os.environ.get('SELECTEL_API_KEY')
-    else:
-        module.fail_json(
-            msg="You must define api_token or env SELECTEL_API_KEY")
 
     config = selectel_dns_api.rest.Configuration()
     config.api_key = {'X-Token': api_token}

@@ -125,6 +125,7 @@ EXAMPLES = '''
 
 import os
 import re
+import sys
 from ansible.module_utils.basic import AnsibleModule
 try:
     import selectel_dns_api
@@ -135,10 +136,10 @@ except ImportError:
 
 
 def domain_idna(domain):
-    if isinstance(domain, str):
+    if sys.version_info.major == 2:
         return domain.decode('utf-8').encode('idna')
-    else:
-        return domain.encode('idna')
+
+    return str(domain.encode('idna'), 'utf-8')
 
 
 def main():

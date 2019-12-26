@@ -137,7 +137,10 @@ except ImportError:
 
 def domain_idna(domain):
     if sys.version_info.major == 2:
-        return domain.decode('utf-8').encode('idna')
+        if isinstance(domain, str):
+            return domain.decode('utf-8').encode('idna')
+        else:
+            return domain.encode('idna')
 
     return str(domain.encode('idna'), 'utf-8')
 
